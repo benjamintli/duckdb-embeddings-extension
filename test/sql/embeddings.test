@@ -1,0 +1,27 @@
+# name: test/sql/embeddings.test
+# description: test quack extension
+# group: [embeddings]
+
+# Before we load the extension, this will fail
+statement error
+SELECT embeddings('Sam');
+----
+Catalog Error: Scalar Function with name embeddings does not exist!
+Did you mean "median"?
+
+# Require statement will ensure this test is run with this extension loaded
+require embeddings
+
+# Require statement will ensure the extension is loaded from now on
+statement ok
+CREATE TABLE people(name TEXT, age INT);
+
+statement ok
+INSERT INTO people VALUES ('Alice', 18), ('Bob', 199), ('Yiran', 101010);
+
+# Confirm the extension works
+query I
+SELECT embeddings(name) from people
+----
+Embeddings Sam 🐥
+
