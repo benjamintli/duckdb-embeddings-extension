@@ -4,7 +4,7 @@
 
 # Before we load the extension, this will fail
 statement error
-SELECT embeddings('Sam');
+SELECT embeddings('model_name', 'Sam');
 ----
 Catalog Error: Scalar Function with name embeddings does not exist!
 Did you mean "median"?
@@ -21,7 +21,8 @@ INSERT INTO people VALUES ('Alice', 18), ('Bob', 199), ('Yiran', 101010);
 
 # Confirm the extension works
 query I
-SELECT embeddings(name) from people
+SELECT embeddings('model_name', name) from people
 ----
-Embeddings Sam 🐥
-
+[0.0, 1.0, 2.0]
+[0.0, 1.0, 2.0]
+[0.0, 1.0, 2.0]

@@ -1,0 +1,14 @@
+[package]
+name = "text_embedding_rust"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]  # or "cdylib" if you want a shared library
+
+[dependencies]
+anyhow = "1.0.98"
+cxx = "1.0.157"
+
+[build-dependencies]
+cxx-build = "1.0.157"
