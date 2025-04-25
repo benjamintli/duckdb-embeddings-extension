@@ -17,12 +17,24 @@ statement ok
 CREATE TABLE people(name TEXT, age INT);
 
 statement ok
-INSERT INTO people VALUES ('Alice', 18), ('Bob', 199), ('Yiran', 101010);
+INSERT INTO people VALUES ('frjekfnr', 18), ('Bob', 199), ('Yiran', 101010);
 
 # Confirm the extension works
 query I
-SELECT embeddings('model_name', name) from people
+SELECT array_length(embeddings('sentence-transformers/all-MiniLM-L6-v2', name)) from people
 ----
-[0.0, 1.0, 2.0]
-[0.0, 1.0, 2.0]
-[0.0, 1.0, 2.0]
+384
+384
+384
+
+query I
+SELECT array_length(embeddings('BAAI/bge-large-en-v1.5', name)) from people
+----
+1024
+1024
+1024
+
+statement error
+SELECT embeddings(name, name) from people
+----
+Invalid type Error: model name is not a constant string!

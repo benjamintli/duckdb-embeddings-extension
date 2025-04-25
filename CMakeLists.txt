@@ -80,7 +80,6 @@ endif()
 corrosion_import_crate(MANIFEST_PATH "${CMAKE_SOURCE_DIR}/../text_embedding_rust/Cargo.toml"
 CRATES "text_embedding_rust"
 )
-corrosion_add_cxxbridge(text_embedding CRATE text_embedding_rust MANIFEST_PATH text_embedding_rust FILES lib.rs)
 
 # Set extension name here
 set(TARGET_NAME embeddings)
@@ -101,12 +100,21 @@ set(EXTENSION_SOURCES src/embeddings_extension.cpp)
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 
+if(APPLE)
+    set_property(TARGET text_embedding_rust APPEND PROPERTY
+        INTERFACE_LINK_LIBRARIES
+        "-framework CoreFoundation"
+        "-framework Security"
+        "-framework SystemConfiguration"
+    )
+endif()
 
-target_link_libraries(${EXTENSION_NAME} text_embedding)
-target_link_libraries(${LOADABLE_EXTENSION_NAME} text_embedding)
+target_link_libraries(${EXTENSION_NAME} text_embedding_rust)
+target_link_libraries(${LOADABLE_EXTENSION_NAME} text_embedding_rust)
+
 
 install(
-  TARGETS ${EXTENSION_NAME} text_embedding text_embedding_rust
+  TARGETS ${EXTENSION_NAME} text_embedding_rust
   EXPORT "${DUCKDB_EXPORT_SET}"
   LIBRARY DESTINATION "${INSTALL_LIB_DIR}"
   ARCHIVE DESTINATION "${INSTALL_LIB_DIR}")

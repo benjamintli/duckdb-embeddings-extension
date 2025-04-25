@@ -2,8 +2,11 @@
 
 #include "duckdb/function/function.hpp"
 #include "duckdb/function/scalar_function.hpp"
-#include "text_embedding/lib.h"
+#include "duckdb/common/types/value.hpp"
+#include "text_embedder.hpp"
 #include <memory>
+#include <mutex>
+#include <vector>
 
 namespace duckdb {
 
@@ -28,11 +31,8 @@ struct EmbeddingsLocalState : public FunctionLocalState {
 	    : text_embedder_ {std::move(text_embedder)} {
 	}
 
-	void embed(const std::string &text, std::vector<Value> &embeddings_output) {
-		embeddings_output.reserve(text_embedder_->get_output_dims());
-		for (const auto &embedding : text_embedder_->embed(text)) {
-			embeddings_output.emplace_back(embedding);
-		}
+	std::vector<Value> embed(const std::string &text) {
+		return text_embedder_->embed(text);
 	}
 
 private:
