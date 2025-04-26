@@ -82,7 +82,7 @@ mod tests {
     #[test]
     fn sanity_embedder_download_and_embed() {
         // 1. Construct (which downloads & builds the model)
-        let te = TextEmbedder::new("").expect("TextEmbedder::new() failed");
+        let te = TextEmbedder::new("sentence-transformers/all-MiniLM-L6-v2").expect("TextEmbedder::new() failed");
 
         // 2. Run embed()
         let prompt = "the quick brown fox jumps over the lazy dog";
