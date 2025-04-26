@@ -16,7 +16,7 @@
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
 
 namespace duckdb {
-
+// NOLINTNEXTLINE: singleton
 std::unordered_map<std::string, std::shared_ptr<TextEmbedder>> TextEmbedder::instances;
 
 inline void EmbeddingsScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {

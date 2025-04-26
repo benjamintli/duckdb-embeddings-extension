@@ -34,7 +34,7 @@ public:
 		}
 	}
 
-	/// Runs embedding on the given prompt and returns a std::vector<float>
+	/// Runs embedding on the given prompt and returns a std::vector<duckdb::Value>
 	std::vector<duckdb::Value> embed(const std::string &prompt) {
 		size_t len = 0;
 		float *raw = text_embedder_embed(handle_, prompt.c_str(), &len);
@@ -81,6 +81,7 @@ public:
 
 private:
 	TextEmbedderHandle handle_ {nullptr};
+	// NOLINTNEXTLINE: singleton
 	static std::unordered_map<std::string, std::shared_ptr<TextEmbedder>> instances;
 };
 
