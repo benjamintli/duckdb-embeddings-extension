@@ -1,16 +1,16 @@
-# name: test/sql/embeddings.test
+# name: test/sql/embed_text.test
 # description: test quack extension
-# group: [embeddings]
+# group: [embed_text]
 
 # Before we load the extension, this will fail
 statement error
-SELECT embeddings('model_name', 'Sam');
+SELECT embed_text('model_name', 'Sam');
 ----
-Catalog Error: Scalar Function with name embeddings does not exist!
-Did you mean "median"?
+Catalog Error: Scalar Function with name embed_text does not exist!
+Did you mean "element_at"?
 
 # Require statement will ensure this test is run with this extension loaded
-require embeddings
+require embed_text
 
 # Require statement will ensure the extension is loaded from now on
 statement ok
@@ -21,20 +21,20 @@ INSERT INTO people VALUES ('frjekfnr', 18), ('Bob', 199), ('Yiran', 101010);
 
 # Confirm the extension works
 query I
-SELECT array_length(embeddings('sentence-transformers/all-MiniLM-L6-v2', name)) from people
+SELECT array_length(embed_text('sentence-transformers/all-MiniLM-L6-v2', name)) from people
 ----
 384
 384
 384
 
 query I
-SELECT array_length(embeddings('BAAI/bge-large-en-v1.5', name)) from people
+SELECT array_length(embed_text('BAAI/bge-large-en-v1.5', name)) from people
 ----
 1024
 1024
 1024
 
 statement error
-SELECT embeddings(name, name) from people
+SELECT embed_text(name, name) from people
 ----
 Invalid type Error: model name is not a constant string!

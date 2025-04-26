@@ -86,7 +86,7 @@ CRATES "text_embedding_rust"
 )
 
 # Set extension name here
-set(TARGET_NAME embeddings)
+set(TARGET_NAME embed_text)
 
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
@@ -94,7 +94,7 @@ set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 project(${TARGET_NAME})
 include_directories(src/include)
 
-set(EXTENSION_SOURCES src/embeddings_extension.cpp)
+set(EXTENSION_SOURCES src/embed_text_extension.cpp)
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
