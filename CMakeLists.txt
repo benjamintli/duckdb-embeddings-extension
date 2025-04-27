@@ -33,6 +33,7 @@ elseif("${OS_NAME}" STREQUAL "osx")
         set(Rust_CARGO_TARGET "aarch64-apple-darwin")
     endif()
 elseif(WIN32)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL") # Use MD_DynamicRelease
     if (MINGW AND "${OS_ARCH}" STREQUAL "arm64")
         set(Rust_CARGO_TARGET "aarch64-pc-windows-gnu")
     elseif (MINGW AND "${OS_ARCH}" STREQUAL "amd64")
