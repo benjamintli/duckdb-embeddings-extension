@@ -3,6 +3,7 @@
 #include "duckdb/common/types.hpp"
 #include "duckdb/common/types/vector.hpp"
 #include "duckdb/function/function.hpp"
+#include "duckdb/function/table_function.hpp"
 #include "text_embedder.hpp"
 #include <memory>
 #include <stdexcept>
@@ -41,7 +42,11 @@ static unique_ptr<FunctionData> EmbedTextBindingFun(ClientContext &context, Scal
 	}
 
 	// initialize the model on bind
-	TextEmbedder::getInstance(arguments[0]->ToString());
+	try {
+		TextEmbedder::getInstance(arguments[0]->ToString());
+	} catch (const std::runtime_error &e) {
+		throw InvalidInputException(e.what());
+	}
 	return nullptr;
 }
 

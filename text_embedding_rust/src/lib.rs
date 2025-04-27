@@ -1,7 +1,10 @@
 mod models;
-use std::ffi::{c_char, CStr};
+use std::{
+    ffi::{c_char, CStr, CString},
+    ptr,
+};
 
-use models::text_embedder::TextEmbedder;
+use models::text_embedder::{BertModelTypes, TextEmbedder};
 
 // --- FFI wrappers ---
 
@@ -10,11 +13,23 @@ pub type TextEmbedderHandle = *mut TextEmbedder;
 
 /// Create a new TextEmbedder and return a raw pointer
 #[no_mangle]
-pub extern "C" fn text_embedder_create(model_id: *const c_char) -> TextEmbedderHandle {
+pub extern "C" fn text_embedder_create(
+    model_id: *const c_char,
+    out_error: *mut *mut c_char,
+) -> TextEmbedderHandle {
     let cstr = unsafe { CStr::from_ptr(model_id) };
     let rust_str = cstr.to_str().unwrap_or("");
-    let t = Box::new(TextEmbedder::new(rust_str).expect("Error loading model!"));
-    Box::into_raw(t)
+    match TextEmbedder::new(rust_str) {
+        Ok(embedder) => Box::into_raw(Box::new(embedder)),
+        Err(e) => {
+            let msg = format!("Failed to load model: {}", e);
+            let c_msg = CString::new(msg).unwrap();
+            unsafe {
+                *out_error = c_msg.into_raw();
+            }
+            ptr::null_mut()
+        }
+    }
 }
 
 /// Drop it
@@ -59,7 +74,7 @@ pub extern "C" fn text_embedder_embed_batch(
     h: TextEmbedderHandle,
     prompts: *const *const c_char,
     n_prompts: usize,
-    out_total_len: *mut usize
+    out_total_len: *mut usize,
 ) -> *mut f32 {
     let t = unsafe {
         assert!(!h.is_null());
@@ -129,4 +144,19 @@ pub extern "C" fn text_embedder_output_dims(h: TextEmbedderHandle) -> usize {
         &*h
     };
     t.get_output_dims()
+}
+
+#[no_mangle]
+pub extern "C" fn text_embedder_free_string(str: *mut c_char) {
+    if !str.is_null() {
+        unsafe {
+            drop(CString::from_raw(str));
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn text_embedder_list_models() -> *mut c_char {
+    let c_msg = CString::new(BertModelTypes::all_hf_hub_ids_as_string()).unwrap();
+    c_msg.into_raw()
 }

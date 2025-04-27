@@ -10,10 +10,6 @@
 #include "duckdb/common/types/value.hpp"
 #include "duckdb/common/types/vector.hpp"
 
-namespace {
-constexpr static size_t BATCH_SIZE = 64;
-}
-
 namespace duckdb {
 
 class TextEmbedder {
@@ -33,9 +29,12 @@ public:
 
 	/// Constructs the embedder (calls text_embedder_create)
 	explicit TextEmbedder(const std::string &model_id) {
-		handle_ = text_embedder_create(model_id.c_str());
+		char *error = nullptr;
+		handle_ = text_embedder_create(model_id.c_str(), &error);
 		if (!handle_) {
-			throw std::runtime_error("Failed to create TextEmbedder");
+			std::string message = "Failed to create TextEmbedder, error: " + std::string(error);
+			text_embedder_free_string(error);
+			throw std::runtime_error(message);
 		}
 	}
 

@@ -39,6 +39,11 @@ SELECT embed_text(name, name) from people
 ----
 Invalid type Error: model name is not a constant string!
 
+statement error
+SELECT embed_text('meta/llama-3', name) from people
+----
+Invalid Input Error: Failed to create TextEmbedder, error: Failed to load model: meta/llama-3 is not a known bert model!
+
 statement ok
 CREATE TABLE big_people(name TEXT, age INT);
 

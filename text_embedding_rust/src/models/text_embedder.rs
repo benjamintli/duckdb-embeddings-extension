@@ -5,6 +5,65 @@ use candle_transformers::models::bert::{BertModel, Config, DTYPE};
 use hf_hub::{api::sync::Api, Repo};
 use tokenizers::Tokenizer;
 
+const MAX_BATCH_SIZE: usize = 64;
+
+pub enum BertModelTypes {
+    SnowflakeArcticEmbedL,
+    UaeLargeV1,
+    MxbaiEmbedLargeV1,
+    SnowflakeArcticEmbedM,
+    BgeLargeEnV15,
+    BgeBaseEnV15,
+    AllMinilmL6V2,
+}
+
+impl BertModelTypes {
+    pub fn to_hf_hub_id(&self) -> &str {
+        match self {
+            BertModelTypes::SnowflakeArcticEmbedL => "Snowflake/snowflake-arctic-embed-l",
+            BertModelTypes::UaeLargeV1 => "WhereIsAI/UAE-Large-V1",
+            BertModelTypes::MxbaiEmbedLargeV1 => "mixedbread-ai/mxbai-embed-large-v1",
+            BertModelTypes::SnowflakeArcticEmbedM => "Snowflake/snowflake-arctic-embed-m",
+            BertModelTypes::BgeLargeEnV15 => "BAAI/bge-large-en-v1.5",
+            BertModelTypes::BgeBaseEnV15 => "BAAI/bge-base-en-v1.5",
+            BertModelTypes::AllMinilmL6V2 => "sentence-transformers/all-MiniLM-L6-v2",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, Error> {
+        // trim the sql string prefix/suffix
+        let s = s.trim_matches('\'');
+        match s {
+            "Snowflake/snowflake-arctic-embed-l" => Ok(BertModelTypes::SnowflakeArcticEmbedL),
+            "WhereIsAI/UAE-Large-V1" => Ok(BertModelTypes::UaeLargeV1),
+            "mixedbread-ai/mxbai-embed-large-v1" => Ok(BertModelTypes::MxbaiEmbedLargeV1),
+            "Snowflake/snowflake-arctic-embed-m" => Ok(BertModelTypes::SnowflakeArcticEmbedM),
+            "BAAI/bge-large-en-v1.5" => Ok(BertModelTypes::BgeLargeEnV15),
+            "BAAI/bge-base-en-v1.5" => Ok(BertModelTypes::BgeBaseEnV15),
+            "sentence-transformers/all-MiniLM-L6-v2" => Ok(BertModelTypes::AllMinilmL6V2),
+            _ => Err(anyhow::Error::msg(format!("{} is not a known bert model!", s))),
+        }
+    }
+
+    pub fn all_hf_hub_ids_as_string() -> String {
+        let all_models = [
+            BertModelTypes::SnowflakeArcticEmbedL,
+            BertModelTypes::UaeLargeV1,
+            BertModelTypes::MxbaiEmbedLargeV1,
+            BertModelTypes::SnowflakeArcticEmbedM,
+            BertModelTypes::BgeLargeEnV15,
+            BertModelTypes::BgeBaseEnV15,
+            BertModelTypes::AllMinilmL6V2,
+        ];
+
+        all_models
+            .iter()
+            .map(|model| model.to_hf_hub_id())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
 pub struct TextEmbedder {
     model: BertModel,
     tokenizer: Tokenizer,
@@ -12,47 +71,11 @@ pub struct TextEmbedder {
     config: Config,
 }
 
-const MAX_BATCH_SIZE: usize = 64;
-
 fn get_device() -> Result<Device, Error> {
     #[cfg(target_os = "macos")]
     return Ok(Device::new_metal(0)?);
     #[cfg(not(target_os = "macos"))]
     return Ok(Device::Cpu);
-}
-
-fn build_model_and_tokenizer(
-    model_id: &str,
-    device: &Device,
-) -> Result<(BertModel, Tokenizer, Config), Error> {
-    let default_model = model_id.trim_matches('\'').to_string();
-
-    let repo = Repo::model(default_model);
-    let (config_filename, tokenizer_filename, weights_filename) = {
-        let api = Api::new()?;
-        let api = api.repo(repo);
-        let config = api.get("config.json")?;
-        let tokenizer = api.get("tokenizer.json")?;
-        let weights = api.get("model.safetensors")?;
-        (config, tokenizer, weights)
-    };
-    let config = std::fs::read_to_string(config_filename)?;
-    let config = serde_json::from_str(&config)?;
-    let mut tokenizer = Tokenizer::from_file(tokenizer_filename).map_err(Error::msg)?;
-    if let Some(pp) = tokenizer.get_padding_mut() {
-        pp.strategy = tokenizers::PaddingStrategy::BatchLongest
-    } else {
-        let pp = tokenizers::PaddingParams {
-            strategy: tokenizers::PaddingStrategy::BatchLongest,
-            ..Default::default()
-        };
-        tokenizer.with_padding(Some(pp));
-    }
-
-    let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[weights_filename], DTYPE, &device)? };
-
-    let model = BertModel::load(vb, &config)?;
-    Ok((model, tokenizer, config))
 }
 
 impl TextEmbedder {
@@ -129,6 +152,40 @@ impl TextEmbedder {
     fn normalize_l2(&self, v: &Tensor) -> Result<Tensor, Error> {
         Ok(v.broadcast_div(&v.sqr()?.sum_keepdim(1)?.sqrt()?)?)
     }
+}
+
+fn build_model_and_tokenizer(
+    model_id: &str,
+    device: &Device,
+) -> Result<(BertModel, Tokenizer, Config), Error> {
+    let model = BertModelTypes::from_str(model_id)?;
+
+    let repo = Repo::model(BertModelTypes::to_hf_hub_id(&model).to_string());
+    let (config_filename, tokenizer_filename, weights_filename) = {
+        let api = Api::new()?;
+        let api = api.repo(repo);
+        let config = api.get("config.json")?;
+        let tokenizer = api.get("tokenizer.json")?;
+        let weights = api.get("model.safetensors")?;
+        (config, tokenizer, weights)
+    };
+    let config = std::fs::read_to_string(config_filename)?;
+    let config = serde_json::from_str(&config)?;
+    let mut tokenizer = Tokenizer::from_file(tokenizer_filename).map_err(Error::msg)?;
+    if let Some(pp) = tokenizer.get_padding_mut() {
+        pp.strategy = tokenizers::PaddingStrategy::BatchLongest
+    } else {
+        let pp = tokenizers::PaddingParams {
+            strategy: tokenizers::PaddingStrategy::BatchLongest,
+            ..Default::default()
+        };
+        tokenizer.with_padding(Some(pp));
+    }
+
+    let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[weights_filename], DTYPE, &device)? };
+
+    let model = BertModel::load(vb, &config)?;
+    Ok((model, tokenizer, config))
 }
 
 #[cfg(test)]
