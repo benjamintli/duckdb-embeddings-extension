@@ -106,6 +106,8 @@ if(APPLE)
         "-framework Security"
         "-framework SystemConfiguration"
     )
+elseif (WIN32)
+    target_link_libraries(text_embedding_rust bcrypt)
 endif()
 
 target_link_libraries(${EXTENSION_NAME} text_embedding_rust)

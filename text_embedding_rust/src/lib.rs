@@ -54,6 +54,62 @@ pub extern "C" fn text_embedder_embed(
     }
 }
 
+#[no_mangle]
+pub extern "C" fn text_embedder_embed_batch(
+    h: TextEmbedderHandle,
+    prompts: *const *const c_char,
+    n_prompts: usize,
+    out_total_len: *mut usize
+) -> *mut f32 {
+    let t = unsafe {
+        assert!(!h.is_null());
+        &*h
+    };
+
+    if prompts.is_null() || out_total_len.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let c_prompts: &[*const c_char] = unsafe { std::slice::from_raw_parts(prompts, n_prompts) };
+    let mut rust_prompts = Vec::with_capacity(n_prompts);
+    for &p in c_prompts {
+        if p.is_null() {
+            return std::ptr::null_mut();
+        }
+        let cstr = unsafe { CStr::from_ptr(p) };
+        match cstr.to_str() {
+            Ok(s) => rust_prompts.push(s),
+            Err(_) => return std::ptr::null_mut(),
+        }
+    }
+
+    let embeddings = match t.embed_batch(&rust_prompts) {
+        Ok(e) => e,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    if embeddings.is_empty() {
+        return std::ptr::null_mut();
+    }
+
+    let embedding_dim = embeddings[0].len();
+    let total_len = n_prompts * embedding_dim;
+
+    let mut flat_embeddings = Vec::with_capacity(total_len);
+    for emb in embeddings {
+        flat_embeddings.extend_from_slice(&emb);
+    }
+
+    let ptr = flat_embeddings.as_mut_ptr();
+    std::mem::forget(flat_embeddings); // transfer ownership to caller
+
+    unsafe {
+        *out_total_len = total_len;
+    }
+
+    ptr
+}
+
 /// Free the float array returned by `embed`
 #[no_mangle]
 pub extern "C" fn text_embedder_free_f32(ptr: *mut f32, len: usize) {

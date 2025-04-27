@@ -1,5 +1,9 @@
+#include <cstdarg>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
+#include <ostream>
+#include <new>
 
 
 struct TextEmbedder;
@@ -15,6 +19,11 @@ TextEmbedderHandle text_embedder_create(const char *model_id);
 
 /// Embed; returns a newly-malloc’d float array and writes its length
 float *text_embedder_embed(TextEmbedderHandle h, const char *prompt, size_t *out_len);
+
+float *text_embedder_embed_batch(TextEmbedderHandle h,
+                                 const char *const *prompts,
+                                 size_t n_prompts,
+                                 size_t *out_total_len);
 
 /// Drop it
 void text_embedder_free(TextEmbedderHandle h);

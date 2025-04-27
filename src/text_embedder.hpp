@@ -2,11 +2,17 @@
 #pragma once
 
 #include "rust.h"
+#include <iostream>
 #include <vector>
 #include <string>
 #include <stdexcept>
 
 #include "duckdb/common/types/value.hpp"
+#include "duckdb/common/types/vector.hpp"
+
+namespace {
+constexpr static size_t BATCH_SIZE = 64;
+}
 
 namespace duckdb {
 
@@ -44,6 +50,24 @@ public:
 		std::vector<duckdb::Value> out(raw, raw + len);
 		text_embedder_free_f32(raw, len);
 		return out;
+	}
+
+	vector<vector<duckdb::Value>> embed_batch(const std::vector<const char *> &prompts) {
+		// Create pointers to store the inputs
+		size_t out_lengths = 0;
+		float *raw_embeddings = text_embedder_embed_batch(handle_, &prompts[0], prompts.size(), &out_lengths);
+		vector<vector<duckdb::Value>> embeddings;
+		embeddings.reserve(prompts.size());
+		for (size_t i = 0; i < out_lengths; i += output_dims()) {
+			vector<duckdb::Value> embedding;
+			embedding.reserve(output_dims());
+			for (size_t j = i; j < output_dims() + i; j++) {
+				embedding.emplace_back(raw_embeddings[j]);
+			}
+			embeddings.push_back(embedding);
+		}
+		text_embedder_free_f32(raw_embeddings, out_lengths);
+		return embeddings;
 	}
 
 	/// Returns the embedding dimensionality

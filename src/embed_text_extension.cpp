@@ -22,11 +22,15 @@ inline void EmbedTextScalarFun(DataChunk &args, ExpressionState &state, Vector &
 	auto &model_name = args.data[0];
 	auto &column_name = args.data[1];
 	auto model_string_ptr = ConstantVector::GetData<string_t>(model_name);
-	auto count = args.size();
-	for (idx_t i = 0; i < count; i++) {
-		const auto &row_value = column_name.GetValue(i).ToString();
-		vector<Value> embedding = TextEmbedder::getInstance(model_string_ptr->GetString())->embed(row_value);
-		result.SetValue(i, Value::LIST(embedding));
+	auto row_counts = args.size();
+	std::vector<const char *> inputs;
+	inputs.reserve(row_counts);
+	for (idx_t i = 0; i < row_counts; i++) {
+		inputs.push_back(column_name.GetValue(i).ToString().c_str());
+	}
+	const auto &embeddings = TextEmbedder::getInstance(model_string_ptr->GetString())->embed_batch(inputs);
+	for (idx_t i = 0; i < row_counts; i++) {
+		result.SetValue(i, Value::LIST(LogicalTypeId::FLOAT, embeddings[i]));
 	}
 }
 
