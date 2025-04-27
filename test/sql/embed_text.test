@@ -14,10 +14,10 @@ require embed_text
 
 # Require statement will ensure the extension is loaded from now on
 statement ok
-CREATE TABLE people(name TEXT, age INT);
+CREATE TABLE people(name TEXT, age INT, embeddings FLOAT[384]);
 
 statement ok
-INSERT INTO people VALUES ('frjekfnr', 18), ('Bob', 199), ('Yiran', 101010);
+INSERT INTO people VALUES ('I like pie', 18, NULL), ('pie tastes amazing', 199, NULL), ('I fucking hate pie', 101010, NULL);
 
 # Confirm the extension works
 query I
@@ -38,3 +38,22 @@ statement error
 SELECT embed_text(name, name) from people
 ----
 Invalid type Error: model name is not a constant string!
+
+statement ok
+CREATE TABLE big_people(name TEXT, age INT);
+
+statement ok
+INSERT INTO big_people
+SELECT 
+    'name_' || i,   -- make name_0, name_1, ...
+    i               -- use i as the number
+FROM 
+    range(0, 10000) t(i);
+
+statement ok
+PRAGMA enable_profiling;
+
+query I
+SELECT COUNT(embed_text('sentence-transformers/all-MiniLM-L6-v2', name)) from big_people
+----
+10000

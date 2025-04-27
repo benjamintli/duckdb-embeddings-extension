@@ -12,8 +12,19 @@ pub struct TextEmbedder {
     config: Config,
 }
 
-fn build_model_and_tokenizer(model_id: &str) -> Result<(BertModel, Tokenizer, Config), Error> {
-    let device = Device::Cpu;
+const MAX_BATCH_SIZE: usize = 64;
+
+fn get_device() -> Result<Device, Error> {
+    #[cfg(target_os = "macos")]
+    return Ok(Device::new_metal(0)?);
+    #[cfg(not(target_os = "macos"))]
+    return Ok(Device::Cpu);
+}
+
+fn build_model_and_tokenizer(
+    model_id: &str,
+    device: &Device,
+) -> Result<(BertModel, Tokenizer, Config), Error> {
     let default_model = model_id.trim_matches('\'').to_string();
 
     let repo = Repo::model(default_model);
@@ -46,11 +57,12 @@ fn build_model_and_tokenizer(model_id: &str) -> Result<(BertModel, Tokenizer, Co
 
 impl TextEmbedder {
     pub fn new(model_id: &str) -> Result<Self, Error> {
-        let (model, tokenizer, config) = build_model_and_tokenizer(model_id)?;
+        let device = get_device()?;
+        let (model, tokenizer, config) = build_model_and_tokenizer(model_id, &device)?;
         Ok(TextEmbedder {
             model,
             tokenizer,
-            device: Device::Cpu,
+            device,
             config,
         })
     }
@@ -77,34 +89,37 @@ impl TextEmbedder {
             return Ok(vec![]);
         }
 
-        // Tokenize all prompts at once
-        let tokens = self
-            .tokenizer
-            .encode_batch(prompts.to_vec(), true)
-            .map_err(Error::msg)?;
-        let token_ids = tokens
-            .iter()
-            .map(|tokens| {
-                let tokens = tokens.get_ids().to_vec();
-                Ok(Tensor::new(tokens.as_slice(), &self.device)?)
-            })
-            .collect::<Result<Vec<_>, Error>>()?;
+        let mut all_embeddings = Vec::new();
 
-        let token_ids = Tensor::stack(&token_ids, 0)?;
-        let token_type_ids = token_ids.zeros_like()?;
-        let embeddings = self.model.forward(&token_ids, &token_type_ids, None)?;
-        // Apply some avg-pooling by taking the mean embedding value for all tokens (including padding)
-        let (_n_sentence, n_tokens, _hidden_size) = embeddings.dims3()?;
-        let embeddings = (embeddings.sum(1)? / (n_tokens as f64))?;
+        for batch_prompts in prompts.chunks(MAX_BATCH_SIZE) {
+            // Tokenize the batch
+            let tokens = self
+                .tokenizer
+                .encode_batch(batch_prompts.to_vec(), true)
+                .map_err(Error::msg)?;
 
-        // Normalize
-        let embeddings = self.normalize_l2(&embeddings)?;
+            let token_ids = tokens
+                .iter()
+                .map(|tokens| {
+                    let tokens = tokens.get_ids().to_vec();
+                    Ok(Tensor::new(tokens.as_slice(), &self.device)?)
+                })
+                .collect::<Result<Vec<_>, Error>>()?;
 
-        // Split back into Vec<Vec<f32>>
-        let embeddings = embeddings.squeeze(1)?;
-        let embedding_vecs = embeddings.to_vec2()?;
+            let token_ids = Tensor::stack(&token_ids, 0)?;
+            let token_type_ids = token_ids.zeros_like()?;
 
-        Ok(embedding_vecs)
+            let embeddings = self.model.forward(&token_ids, &token_type_ids, None)?;
+            let (_n_sentence, n_tokens, _hidden_size) = embeddings.dims3()?;
+            let embeddings = (embeddings.sum(1)? / (n_tokens as f64))?;
+            let embeddings = self.normalize_l2(&embeddings)?;
+            let embeddings = embeddings.squeeze(1)?;
+            let batch_embeddings = embeddings.to_vec2()?;
+
+            all_embeddings.extend(batch_embeddings);
+        }
+
+        Ok(all_embeddings)
     }
 
     pub fn get_output_dims(&self) -> usize {
@@ -123,6 +138,7 @@ mod tests {
     /// Sanity check for TextEmbedder::new() + embed().
     ///
     /// This is a slow, network-dependent test, so it’s ignored by default.
+    #[ignore]
     #[test]
     fn sanity_embedder_download_and_embed() {
         // 1. Construct (which downloads & builds the model)
@@ -155,6 +171,7 @@ mod tests {
         );
     }
 
+    #[ignore]
     #[test]
     fn sanity_embedder_batch_embed() {
         // 1. Construct (downloads & builds the model)

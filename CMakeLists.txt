@@ -100,14 +100,18 @@ build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 
 if(APPLE)
+    # link some mac specific libraries, and Metal for fast embedding inference
     set_property(TARGET text_embedding_rust APPEND PROPERTY
         INTERFACE_LINK_LIBRARIES
         "-framework CoreFoundation"
         "-framework Security"
         "-framework SystemConfiguration"
+        "-framework Metal"
+        "-framework CoreFoundation"
+        "-framework MetalPerformanceShaders"
     )
 elseif (WIN32)
-    target_link_libraries(text_embedding_rust bcrypt)
+    target_link_libraries(text_embedding_rust INTERFACE bcrypt)
 endif()
 
 target_link_libraries(${EXTENSION_NAME} text_embedding_rust)

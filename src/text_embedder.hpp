@@ -52,10 +52,15 @@ public:
 		return out;
 	}
 
-	vector<vector<duckdb::Value>> embed_batch(const std::vector<const char *> &prompts) {
+	vector<vector<duckdb::Value>> embed_batch(const std::vector<std::string> &prompts) {
 		// Create pointers to store the inputs
 		size_t out_lengths = 0;
-		float *raw_embeddings = text_embedder_embed_batch(handle_, &prompts[0], prompts.size(), &out_lengths);
+		std::vector<const char *> prompts_cstr;
+		prompts_cstr.reserve(prompts.size());
+		for (const auto &prompt : prompts) {
+			prompts_cstr.push_back(prompt.c_str());
+		}
+		float *raw_embeddings = text_embedder_embed_batch(handle_, &prompts_cstr[0], prompts_cstr.size(), &out_lengths);
 		vector<vector<duckdb::Value>> embeddings;
 		embeddings.reserve(prompts.size());
 		for (size_t i = 0; i < out_lengths; i += output_dims()) {

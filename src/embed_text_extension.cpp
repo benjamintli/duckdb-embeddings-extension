@@ -18,15 +18,15 @@ namespace duckdb {
 // NOLINTNEXTLINE: singleton
 std::unordered_map<std::string, std::shared_ptr<TextEmbedder>> TextEmbedder::instances;
 
-inline void EmbedTextScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
+inline void EmbedTextBatchScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto &model_name = args.data[0];
 	auto &column_name = args.data[1];
 	auto model_string_ptr = ConstantVector::GetData<string_t>(model_name);
 	auto row_counts = args.size();
-	std::vector<const char *> inputs;
+	std::vector<std::string> inputs;
 	inputs.reserve(row_counts);
 	for (idx_t i = 0; i < row_counts; i++) {
-		inputs.push_back(column_name.GetValue(i).ToString().c_str());
+		inputs.push_back(column_name.GetValue(i).ToString());
 	}
 	const auto &embeddings = TextEmbedder::getInstance(model_string_ptr->GetString())->embed_batch(inputs);
 	for (idx_t i = 0; i < row_counts; i++) {
@@ -49,7 +49,7 @@ static void LoadInternal(DatabaseInstance &instance) {
 	// Register a scalar function
 	auto embedding_scalar_functions =
 	    ScalarFunction("embed_text", {LogicalType::VARCHAR, LogicalType::VARCHAR},
-	                   LogicalType::LIST(LogicalType::FLOAT), EmbedTextScalarFun, EmbedTextBindingFun);
+	                   LogicalType::LIST(LogicalType::FLOAT), EmbedTextBatchScalarFun, EmbedTextBindingFun);
 	ExtensionUtil::RegisterFunction(instance, embedding_scalar_functions);
 }
 
